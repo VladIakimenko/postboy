@@ -47,21 +47,20 @@ def format_curl(command: str) -> str:
             continue
 
         if part == "-H":
-            formatted_command.append(f"{part} {parts[i + 1]}")
+            formatted_command.append(f"{part} \"{parts[i + 1]}\" \\")
             skip_next = True
         elif part == "-d":
-            formatted_command.append(part)
-            formatted_command.append(
-                json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4)
-            )
+            formatted_json = json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4)
+            formatted_command.append(f"{part} '{formatted_json}' \\")
             skip_next = True
         else:
             formatted_command.append(part)
 
-    formatted_command_str = " ".join(formatted_command[:3])
-    formatted_command_str += "\n" + "\n".join(formatted_command[3:])
+    first_part = ' '.join(formatted_command[:3])
+    rest_of_the_command = '\n'.join(formatted_command[3:-1])
+    last_part = formatted_command[-1]
 
-    return formatted_command_str
+    return f"{first_part} \\\n{rest_of_the_command}\n{last_part}"
 
 
 def process_curl_option(command: str, requested_curls: list):
