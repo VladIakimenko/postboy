@@ -6,12 +6,10 @@ import shlex
 from completers import CombinedCompleter, Completer
 from curl_store import CurlStore
 
-
-readline.parse_and_bind('tab: complete')
-CURL_OPTIONS = ['add', 'list', 'view', 'change', 'delete', 'execute']
-VAR_OPTIONS = ['variables', 'set', 'grab']
-COMMON_OPTIONS = ['quit']
-OPTIONS = CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS
+readline.parse_and_bind("tab: complete")
+CURL_OPTIONS = ["add", "list", "view", "change", "delete", "execute"]
+VAR_OPTIONS = ["variables", "set", "grab"]
+COMMON_OPTIONS = ["quit"]
 
 
 def multiline_input(prompt):
@@ -23,7 +21,7 @@ def multiline_input(prompt):
             lines.append(line)
         else:
             break
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def process_response(response):
@@ -48,20 +46,138 @@ def format_curl(command: str) -> str:
             skip_next = False
             continue
 
-        if part == '-H':
+        if part == "-H":
             formatted_command.append(f"{part} {parts[i + 1]}")
             skip_next = True
-        elif part == '-d':
+        elif part == "-d":
             formatted_command.append(part)
-            formatted_command.append(json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4))
+            formatted_command.append(
+                json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4)
+            )
             skip_next = True
         else:
             formatted_command.append(part)
 
-    formatted_command_str = ' '.join(formatted_command[:3])
-    formatted_command_str += '\n' + '\n'.join(formatted_command[3:])
+    formatted_command_str = " ".join(formatted_command[:3])
+    formatted_command_str += "\n" + "\n".join(formatted_command[3:])
 
     return formatted_command_str
+
+
+def process_curl_option(command: str, requested_curls: list):
+    if not requested_curls and command != "list":
+        completer = curl_completer if command not in "add" else None
+        readline.set_completer(completer.complete)
+        requested_curls.append(
+            input(f"{command.capitalize()}ing curl command. Enter name: ")
+        )
+
+    def list_curls():
+        all_curls = store.list_commands()
+        if all_curls:
+            print()
+            for curl_name in all_curls:
+                print(curl_name)
+            print()
+        else:
+            print("No curls saved yet.")
+
+    def add_curl():
+        curl = multiline_input(
+            f"Enter your curl command for {name} (double enter to submit): "
+        )
+        if store.verify_curl(curl):
+            store.save_command(name, curl)
+            print(f"Curl command saved under name: '{name}'.")
+        else:
+            print("Invalid curl command.")
+
+    def view_curl():
+        curl = format_curl(store.commands.get(name))
+        print(f"\n{curl}\n")
+
+    def change_curl():
+        current_command = store.commands.get(name, "")
+        print(f"Current curl for {name}:")
+        print(f"\n{current_command}\n")
+        new_command = multiline_input(
+            f"Enter the new curl command for {name} (double enter to submit): "
+        )
+        if store.verify_curl(new_command):
+            store.save_command(name, new_command)
+            print(f"Curl command {name} has been updated.")
+        else:
+            print("Invalid curl command.")
+
+    def delete_curl():
+        store.delete_command(name)
+        print(f"Curl command {name} has been deleted.")
+
+    def execute_curl():
+        response = store.execute_command(choice)
+        process_response(response)
+
+    name_specific_commands_map = {
+        "add": add_curl,
+        "view": view_curl,
+        "change": change_curl,
+        "delete": delete_curl,
+        "execute": execute_curl,
+    }
+
+    if command == "list":
+        list_curls()
+    else:
+        for name in requested_curls:
+            if name not in store.list_commands() and command != "add":
+                print(f"No command found with the name: '{name}'.")
+                continue
+            name_specific_commands_map[command]()
+
+
+def process_variable_option(command: str, requested_variables: list):
+    if "*" in requested_variables:
+        requested_variables = list(store.variables.keys())
+
+    if not requested_variables and command != "variables":
+        completer = variable_completer
+        readline.set_completer(completer.complete)
+        requested_variables.append(
+            input(f"Enter the name of the variable to {command}: ")
+        )
+
+    def list_vars():
+        variables = store.list_variables()
+        if variables:
+            print()
+            for key, value in variables.items():
+                print(f"{key}: '{value}'")
+            print()
+        else:
+            print("No variables saved yet.")
+
+    def set_var():
+        readline.set_completer(None)
+        new_value = input(f"Enter the value for '{var_name}': ")
+        store.set_variable(var_name, new_value)
+        if var_name in store.grablist:
+            store.grablist.remove(var_name)
+        print(f"'{var_name}' saved.")
+
+    def grab_var():
+        store.grablist.append(var_name)
+        print(f"'{var_name}' is set to be extracted from responses.")
+
+    name_specific_commands_map = {
+        "set": set_var,
+        "grab": grab_var,
+    }
+
+    if command == "variables":
+        list_vars()
+    else:
+        for var_name in requested_variables:
+            name_specific_commands_map[command]()
 
 
 if __name__ == "__main__":
@@ -75,145 +191,53 @@ if __name__ == "__main__":
 
     mapping = {
         **{option: curl_commands for option in CURL_OPTIONS},
-        **{option: variables for option in VAR_OPTIONS}
+        **{option: variables for option in VAR_OPTIONS},
     }
     main_completer = CombinedCompleter(
         option_to_args_mapping=mapping,
         no_arg_options=COMMON_OPTIONS,
-        all_options=OPTIONS + curl_commands,
+        all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + curl_commands,
     )
 
     while True:
         try:
             readline.set_completer(main_completer.complete)
-            input_ = input("> ").rstrip().replace(',', ' ').split()
-            choice, args = input_[0], input_[1:]
+            input_ = input("> ").rstrip().replace(",", " ").split()
+            if input_:
+                choice, args = input_[0], input_[1:]
 
-            if choice in OPTIONS:
-                if choice == "add":
-                    if not args:
-                        args.append(input("Enter a name for the command to add: "))
-                    for name in args:
-                        command = multiline_input(f"Enter your curl command for {name} (double enter to submit): ")
-                        if store.verify_curl(command):
-                            store.save_command(name, command)
-                            print(f"Curl command saved under name: '{name}'.")
-                        else:
-                            print("Invalid curl command.")
+                if choice in CURL_OPTIONS:
+                    process_curl_option(choice, args)
 
-                elif choice == "view":
-                    if not args:
-                        readline.set_completer(curl_completer.complete)
-                        input("Enter the name of the command to view: ")
-                    for name in args:
-                        if name in store.list_commands():
-                            curl = format_curl(store.get_command(name))
-                            print(f"\n{curl}\n")
-                        else:
-                            print(f"No command found with the name: {name}.")
-
-                elif choice == "list":
-                    commands = store.list_commands()
-                    if commands:
-                        print()
-                        for cmd in commands:
-                            print(cmd)
-                        print()
-                    else:
-                        print("No commands saved yet.")
-
-                elif choice == "change":
-                    if not args:
-                        readline.set_completer(curl_completer.complete)
-                        args.append(input("Enter the name of the command to modify: "))
-                    for name in args:
-                        if name in store.list_commands():
-                            current_command = store.get_command(name)
-                            print(f"Current curl for {name}:")
-                            print(f"\n{current_command}\n")
-                            new_command = multiline_input(
-                                f"Enter the new curl command for {name} (double enter to submit): "
-                            )
-                            if store.verify_curl(new_command):
-                                store.save_command(name, new_command)
-                                print(f"Curl command {name} has been updated.")
-                            else:
-                                print("Invalid curl command.")
-                        else:
-                            print(f"No command found with the name: {name}.")
-
-                elif choice == "delete":
-                    if not args:
-                        readline.set_completer(curl_completer.complete)
-                        args.append(input("Enter the name of the command to delete: "))
-                    for name in args:
-                        if name in store.list_commands():
-                            store.delete_command(name)
-                            print(f"Curl command {name} has been deleted.")
-                        else:
-                            print(f"No command found with the name: {name}.")
-
-                elif choice == "execute":
-                    if not args:
-                        readline.set_completer(curl_completer.complete)
-                        args.append(input("Enter the name of the command to execute: "))
-                    for name in args:
-                        response = store.execute_command(name)
-                        process_response(response)
-
-                elif choice == "variables":
-                    variables = store.list_variables()
-                    if variables:
-                        print()
-                        for key, value in variables.items():
-                            print(f"{key}: '{value}'")
-                        print()
-                    else:
-                        print("No variables saved yet.")
-
-                elif choice == "set":
-                    if not args:
-                        readline.set_completer(variable_completer.complete)
-                        args.append(input("Enter the name of the variable to set: "))
-                    for var_name in args:
-                        readline.set_completer(None)
-                        new_value = input(f"Enter the value for '{var_name}': ")
-                        store.save_variable(var_name, new_value)
-                        if var_name in store.grablist:
-                            store.grablist.remove(var_name)
-                        print(f"'{var_name}' saved.")
-
-                elif choice == "grab":
-                    if not args:
-                        readline.set_completer(variable_completer.complete)
-                        args.append(input("Enter the name of the variable to grab from responses: "))
-                    for var_name in args:
-                        store.grablist.append(var_name)
-                        print(f"'{var_name}' is set to be extracted from responses.")
+                elif choice in VAR_OPTIONS:
+                    process_variable_option(choice, args)
 
                 elif choice == "quit":
                     for key, value in store.commands.items():
-                        value = ' '.join(value.split())
-                        value = value.replace('\\', '')
+                        value = " ".join(value.split())
+                        value = value.replace("\\", "")
                         store.commands[key] = value
                     store.save_to_files()
                     print("Data saved. Any key to exit.")
                     input()
                     break
 
-            elif choice == "":
-                continue
+                elif choice in store.list_commands():
+                    response = store.execute_command(choice)
+                    process_response(response)
 
-            elif choice in store.list_commands():
-                response = store.execute_command(choice)
-                process_response(response)
+                else:
+                    print(
+                        "\n"
+                        + "\n".join(CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS)
+                        + "\n"
+                    )
 
             else:
-                print("\n" + "\n".join(OPTIONS) + "\n")
+                continue
 
         except KeyboardInterrupt:
             print("\n")
             continue
         except Exception as e:
             print(f"An error occurred: {e}")
-            
