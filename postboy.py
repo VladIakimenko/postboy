@@ -3,37 +3,15 @@ import json
 import readline
 import shlex
 
+from completers import CombinedCompleter, Completer
 from curl_store import CurlStore
 
 
 readline.parse_and_bind('tab: complete')
-OPTIONS = ['add', 'list', 'view', 'change', 'delete', 'execute', 'variables', 'set', 'grab', 'quit']
-
-# accept arguments after main menu commands
-
-
-def main_completer(text, state):    # Turn into classes and realize inheritance
-    options = OPTIONS + store.list_commands()
-    matches = [i for i in options if i.startswith(text)]
-    if state < len(matches):
-        return matches[state]
-    return None
-
-
-def curl_completer(text, state):
-    options = store.list_commands()
-    matches = [i for i in options if i.startswith(text)]
-    if state < len(matches):
-        return matches[state]
-    return None
-
-
-def variable_completer(text, state):
-    options = store.list_variables()
-    matches = [i for i in options if i.startswith(text)]
-    if state < len(matches):
-        return matches[state]
-    return None
+CURL_OPTIONS = ['add', 'list', 'view', 'change', 'delete', 'execute']
+VAR_OPTIONS = ['variables', 'set', 'grab']
+COMMON_OPTIONS = ['quit']
+OPTIONS = CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS
 
 
 def multiline_input(prompt):
@@ -89,27 +67,50 @@ def format_curl(command: str) -> str:
 if __name__ == "__main__":
     store = CurlStore()
 
+    curl_commands = store.list_commands()
+    variables = store.list_variables()
+
+    curl_completer = Completer(store.list_commands())
+    variable_completer = Completer(store.list_variables())
+
+    mapping = {
+        **{option: curl_commands for option in CURL_OPTIONS},
+        **{option: variables for option in VAR_OPTIONS}
+    }
+    main_completer = CombinedCompleter(
+        option_to_args_mapping=mapping,
+        no_arg_options=COMMON_OPTIONS,
+        all_options=OPTIONS + curl_commands,
+    )
+
     while True:
         try:
-            readline.set_completer(main_completer)
-            choice = input("> ").rstrip()
+            readline.set_completer(main_completer.complete)
+            input_ = input("> ").rstrip().replace(',', ' ').split()
+            choice, args = input_[0], input_[1:]
 
-            if choice in OPTIONS:                       # consider dict-mapped menu
+            if choice in OPTIONS:
                 if choice == "add":
-                    name = input("Enter a name for the command: ")
-                    command = multiline_input("Enter your curl command (double enter to submit): ")
-
-                    if store.verify_curl(command):
-                        store.save_command(name, command)
-                        print(f"Curl command saved under name: '{name}'.")
-                    else:
-                        print("Invalid curl command.")
+                    if not args:
+                        args.append(input("Enter a name for the command to add: "))
+                    for name in args:
+                        command = multiline_input(f"Enter your curl command for {name} (double enter to submit): ")
+                        if store.verify_curl(command):
+                            store.save_command(name, command)
+                            print(f"Curl command saved under name: '{name}'.")
+                        else:
+                            print("Invalid curl command.")
 
                 elif choice == "view":
-                    readline.set_completer(curl_completer)
-                    name = input("Enter the name of the command: ")
-                    curl = format_curl(store.get_command(name))
-                    print(f"\n{curl}\n")
+                    if not args:
+                        readline.set_completer(curl_completer.complete)
+                        input("Enter the name of the command to view: ")
+                    for name in args:
+                        if name in store.list_commands():
+                            curl = format_curl(store.get_command(name))
+                            print(f"\n{curl}\n")
+                        else:
+                            print(f"No command found with the name: {name}.")
 
                 elif choice == "list":
                     commands = store.list_commands()
@@ -122,36 +123,43 @@ if __name__ == "__main__":
                         print("No commands saved yet.")
 
                 elif choice == "change":
-                    readline.set_completer(curl_completer)
-                    name = input("Enter the name of the command to modify: ")
-
-                    if name in store.list_commands():
-                        current_command = store.get_command(name)
-                        print(f"Current curl for {name}:")
-                        print(f"\n{current_command}\n")
-                        new_command = multiline_input("Enter the new curl command (double enter to submit): ")
-                        if store.verify_curl(new_command):
-                            store.save_command(name, new_command)
-                            print(f"Curl command {name} has been updated.")
+                    if not args:
+                        readline.set_completer(curl_completer.complete)
+                        args.append(input("Enter the name of the command to modify: "))
+                    for name in args:
+                        if name in store.list_commands():
+                            current_command = store.get_command(name)
+                            print(f"Current curl for {name}:")
+                            print(f"\n{current_command}\n")
+                            new_command = multiline_input(
+                                f"Enter the new curl command for {name} (double enter to submit): "
+                            )
+                            if store.verify_curl(new_command):
+                                store.save_command(name, new_command)
+                                print(f"Curl command {name} has been updated.")
+                            else:
+                                print("Invalid curl command.")
                         else:
-                            print("Invalid curl command.")
-                    else:
-                        print(f"No command found with the name: {name}.")
+                            print(f"No command found with the name: {name}.")
 
                 elif choice == "delete":
-                    readline.set_completer(curl_completer)
-                    name = input("Enter the name of the command to delete: ")
-                    if name in store.list_commands():
-                        store.delete_command(name)
-                        print(f"Curl command {name} has been deleted.")
-                    else:
-                        print(f"No command found with the name: {name}.")
+                    if not args:
+                        readline.set_completer(curl_completer.complete)
+                        args.append(input("Enter the name of the command to delete: "))
+                    for name in args:
+                        if name in store.list_commands():
+                            store.delete_command(name)
+                            print(f"Curl command {name} has been deleted.")
+                        else:
+                            print(f"No command found with the name: {name}.")
 
                 elif choice == "execute":
-                    readline.set_completer(curl_completer)
-                    name = input("Enter the name of the command: ")
-                    response = store.execute_command(name)
-                    process_response(response)
+                    if not args:
+                        readline.set_completer(curl_completer.complete)
+                        args.append(input("Enter the name of the command to execute: "))
+                    for name in args:
+                        response = store.execute_command(name)
+                        process_response(response)
 
                 elif choice == "variables":
                     variables = store.list_variables()
@@ -164,20 +172,24 @@ if __name__ == "__main__":
                         print("No variables saved yet.")
 
                 elif choice == "set":
-                    readline.set_completer(variable_completer)
-                    var_name = input("Enter the name of the variable to set: ")
-                    readline.set_completer(None)
-                    new_value = input(f"Enter the value for '{var_name}': ")
-                    store.save_variable(var_name, new_value)
-                    if var_name in store.grablist:
-                        store.grablist.remove(var_name)
-                    print(f"'{var_name}' saved.")
+                    if not args:
+                        readline.set_completer(variable_completer.complete)
+                        args.append(input("Enter the name of the variable to set: "))
+                    for var_name in args:
+                        readline.set_completer(None)
+                        new_value = input(f"Enter the value for '{var_name}': ")
+                        store.save_variable(var_name, new_value)
+                        if var_name in store.grablist:
+                            store.grablist.remove(var_name)
+                        print(f"'{var_name}' saved.")
 
                 elif choice == "grab":
-                    readline.set_completer(variable_completer)
-                    var_name = input("Enter the name of the variable to grab from responses: ")
-                    store.grablist.append(var_name)
-                    print(f"'{var_name}' is set to be extracted from responses.")
+                    if not args:
+                        readline.set_completer(variable_completer.complete)
+                        args.append(input("Enter the name of the variable to grab from responses: "))
+                    for var_name in args:
+                        store.grablist.append(var_name)
+                        print(f"'{var_name}' is set to be extracted from responses.")
 
                 elif choice == "quit":
                     for key, value in store.commands.items():
@@ -204,3 +216,4 @@ if __name__ == "__main__":
             continue
         except Exception as e:
             print(f"An error occurred: {e}")
+            
