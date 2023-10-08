@@ -87,6 +87,9 @@ def process_curl_option(command: str, requested_curls: list):
         )
         if store.verify_curl(curl):
             store.save_command(name, curl)
+            main_completer.refresh(
+                all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + list(curl_commands)
+            )
             print(f"Curl command saved under name: '{name}'.")
         else:
             print("Invalid curl command.")
@@ -110,6 +113,9 @@ def process_curl_option(command: str, requested_curls: list):
 
     def delete_curl():
         store.delete_command(name)
+        main_completer.refresh(
+            all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + list(curl_commands)
+        )
         print(f"Curl command {name} has been deleted.")
 
     def execute_curl():
@@ -182,12 +188,18 @@ def process_variable_option(command: str, requested_variables: list):
 if __name__ == "__main__":
     store = CurlStore()
 
-    curl_commands = store.list_commands()
-    variables = store.list_variables()
-
-    curl_completer = Completer(curl_commands)
-    variable_completer = Completer(variables)
-
+    # We use dict.keys() for completers' options here to leverage the dicts property of updating dynamically.
+    # The dict.keys() provides a view object that displays a list of all the keys in the dictionary.
+    # This means, when a new command or variable is added or removed in the underlying dictionary,
+    # the curl_commands and variables views are automatically updated.
+    # As a result, the Competer objects will always offer options
+    # that are current and inclusive of recently added commands or variables, without
+    # requiring a manual update or refresh, while the CombinedCompleter object will only require
+    # a partial refresh.
+    curl_commands = store.commands.keys()
+    variables = store.variables.keys()
+    curl_completer = Completer(options=curl_commands)
+    variable_completer = Completer(options=variables)
     mapping = {
         **{option: curl_commands for option in CURL_OPTIONS},
         **{option: variables for option in VAR_OPTIONS},
@@ -195,7 +207,7 @@ if __name__ == "__main__":
     main_completer = CombinedCompleter(
         option_to_args_mapping=mapping,
         no_arg_options=COMMON_OPTIONS,
-        all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + curl_commands,
+        all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + list(curl_commands),
     )
 
     while True:

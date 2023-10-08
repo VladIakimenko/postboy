@@ -63,3 +63,29 @@ class CombinedCompleter(Completer):
             self.options = self.get_args_for_option(tokens[0])
 
         return super().complete(text, state)
+
+    def refresh(self, **kwargs):
+        """
+        Refreshes the attributes of the CombinedCompleter object with the provided keyword arguments.
+        Accepts keyword arguments only that should correspond to existing CombineCompleter attributes.
+
+        Example:
+        - To update the `option_to_args_mapping` and `no_arg_options` attributes:
+            main_completer.refresh(
+                option_to_args_mapping=new_option_to_args_mapping,
+                no_arg_options=new_no_arg_options
+            )
+
+        Raises:
+        - ValueError: If no keyword arguments are provided.
+        - AttributeError: If a provided keyword argument does not correspond to an existing attribute
+          of the CombinedCompleter object.
+        """
+        if not kwargs:
+            raise ValueError("At least one attribute should be provided for updating.")
+
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise AttributeError(f"The attribute '{key}' does not exist.")
