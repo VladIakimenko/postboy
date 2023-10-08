@@ -103,10 +103,12 @@ class CurlStore:
 
         http_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
 
-        if parts[1].startswith('-') or re.match(r'http[s]?://', parts[1], re.IGNORECASE):
-            return False, "An HTTP method must be explicitly stated (even if it is GET)."
-        elif parts[1].upper() not in http_methods:
-            return False, f"'{parts[1]}' is not a recognized HTTP method."
+        if '-X' not in parts:
+            return False, "An HTTP method must be explicitly stated using -X option (even if it's GET)."
+
+        method_index = parts.index('-X') + 1
+        if method_index >= len(parts) or parts[method_index].upper() not in http_methods:
+            return False, "A valid HTTP method must follow the -X option."
 
         url_part_exists = any(re.match(r'http[s]?://', part, re.IGNORECASE) for part in parts[2:])
         if not url_part_exists:
