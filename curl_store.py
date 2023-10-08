@@ -91,7 +91,32 @@ class CurlStore:
 
     @staticmethod
     def verify_curl(curl_cmd):
-        return curl_cmd.strip().startswith("curl") and len(curl_cmd.strip()) > 0
+        curl_cmd = curl_cmd.strip()
+
+        if not curl_cmd.startswith("curl"):
+            return False, "The command must start with 'curl'."
+
+        parts = shlex.split(curl_cmd)
+
+        if len(parts) < 3:
+            return False, "The command is incomplete."
+
+        http_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
+
+        if parts[1].startswith('-') or re.match(r'http[s]?://', parts[1], re.IGNORECASE):
+            return False, "An HTTP method must be explicitly stated (even if it is GET)."
+        elif parts[1].upper() not in http_methods:
+            return False, f"'{parts[1]}' is not a recognized HTTP method."
+
+        url_part_exists = any(re.match(r'http[s]?://', part, re.IGNORECASE) for part in parts[2:])
+        if not url_part_exists:
+            return False, "A valid URL must be provided."
+
+        for i, part in enumerate(parts):
+            if part in ("-H", "-F", "-d") and (i == len(parts) - 1 or parts[i + 1].startswith('-')):
+                return False, f"The option '{part}' must have an accompanying value."
+
+        return True, ''
 
     @staticmethod
     def strip_hack(command):

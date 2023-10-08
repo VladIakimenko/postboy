@@ -57,10 +57,16 @@ def format_curl(command: str) -> str:
             formatted_command.append(part)
 
     first_part = ' '.join(formatted_command[:3])
-    rest_of_the_command = '\n'.join(formatted_command[3:-1])
-    last_part = formatted_command[-1]
+    rest_of_the_command = '\n'.join([part for part in formatted_command[3:-1] if part.strip()])
+    last_part = formatted_command[-1] if formatted_command[-1].strip() else ""
 
-    return CurlStore.strip_hack(f"{first_part} \\\n{rest_of_the_command}\n{last_part}")
+    final_command = first_part
+    if rest_of_the_command:
+        final_command += " \\\n" + rest_of_the_command
+
+    final_command += "\n" + last_part if last_part else ""
+
+    return CurlStore.strip_hack(final_command)
 
 
 def process_curl_option(command: str, requested_curls: list):
@@ -85,14 +91,15 @@ def process_curl_option(command: str, requested_curls: list):
         curl = multiline_input(
             f"Enter your curl command for {name} (double enter to submit): "
         )
-        if store.verify_curl(curl):
+        verified, reason = store.verify_curl(curl)
+        if verified:
             store.save_command(name, curl)
             main_completer.refresh(
                 all_options=CURL_OPTIONS + VAR_OPTIONS + COMMON_OPTIONS + list(curl_commands)
             )
             print(f"Curl command saved under name: '{name}'.")
         else:
-            print("Invalid curl command.")
+            print(f"Invalid curl command. {reason}")
 
     def view_curl():
         curl = format_curl(store.commands.get(name))
@@ -105,11 +112,12 @@ def process_curl_option(command: str, requested_curls: list):
         new_command = multiline_input(
             f"Enter the new curl command for {name} (double enter to submit): "
         )
-        if store.verify_curl(new_command):
+        verified, reason = store.verify_curl(new_command)
+        if verified:
             store.save_command(name, new_command)
             print(f"Curl command {name} has been updated.")
         else:
-            print("Invalid curl command.")
+            print(f"Invalid curl command. {reason}")
 
     def delete_curl():
         store.delete_command(name)
