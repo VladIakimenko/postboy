@@ -46,7 +46,7 @@ def format_curl(command: str) -> str:
             skip_next = False
             continue
 
-        if part == "-H":
+        if part in ("-H", "-F"):
             formatted_command.append(f"{part} \"{parts[i + 1]}\" \\")
             skip_next = True
         elif part == "-d":
@@ -60,13 +60,13 @@ def format_curl(command: str) -> str:
     rest_of_the_command = '\n'.join(formatted_command[3:-1])
     last_part = formatted_command[-1]
 
-    return f"{first_part} \\\n{rest_of_the_command}\n{last_part}"
+    return CurlStore.strip_hack(f"{first_part} \\\n{rest_of_the_command}\n{last_part}")
 
 
 def process_curl_option(command: str, requested_curls: list):
     if not requested_curls and command != "list":
-        completer = curl_completer if command not in "add" else None
-        readline.set_completer(completer.complete)
+        completer_func = curl_completer.complete if command != "add" else None
+        readline.set_completer(completer_func)
         requested_curls.append(
             input(f"{command.capitalize()}ing curl command. Enter name: ")
         )
@@ -139,8 +139,8 @@ def process_variable_option(command: str, requested_variables: list):
         requested_variables = list(store.variables.keys())
 
     if not requested_variables and command != "variables":
-        completer = variable_completer
-        readline.set_completer(completer.complete)
+        completer_func = variable_completer.complete
+        readline.set_completer(completer_func)
         requested_variables.append(
             input(f"Enter the name of the variable to {command}: ")
         )
@@ -185,8 +185,8 @@ if __name__ == "__main__":
     curl_commands = store.list_commands()
     variables = store.list_variables()
 
-    curl_completer = Completer(store.list_commands())
-    variable_completer = Completer(store.list_variables())
+    curl_completer = Completer(curl_commands)
+    variable_completer = Completer(variables)
 
     mapping = {
         **{option: curl_commands for option in CURL_OPTIONS},
@@ -212,10 +212,13 @@ if __name__ == "__main__":
                     process_variable_option(choice, args)
 
                 elif choice == "quit":
+                    # temp formatting block  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                     for key, value in store.commands.items():
                         value = " ".join(value.split())
                         value = value.replace("\\", "")
+                        value = store.strip_hack(value)
                         store.commands[key] = value
+                    # >>>>>>>>>  remove when all the curls migrate to proper format
                     store.save_to_files()
                     print("Data saved. Any key to exit.")
                     input()

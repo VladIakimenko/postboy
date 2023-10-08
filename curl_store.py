@@ -6,24 +6,28 @@ import subprocess
 
 
 class CurlStore:
-    COMMANDS_FILE = "postboy_data/commands.json"
+    commands_file = "postboy_data/commands.json"
 
     def __init__(self):
         self.commands = {}
         self.variables = {}
         self.grablist = []
 
-        if os.path.exists(self.COMMANDS_FILE):
-            with open(self.COMMANDS_FILE, "r") as f:
+        if os.path.exists(self.commands_file):
+            with open(self.commands_file, "r") as f:
                 self.commands = json.load(f)
 
     def save_to_files(self):
-        with open(self.COMMANDS_FILE, "w") as f:
-            json.dump(self.commands, f, indent=4)
+        dir_path = os.path.split(self.commands_file)[0]
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        with open(self.commands_file, "w") as f:
+            json.dump(self.commands, f, indent=4, ensure_ascii=False)
 
     def save_command(self, name, command):
         command = command.replace("\\", "")
         command = " ".join(command.split())
+        command = self.strip_hack(command)
         self.commands[name] = command
 
     def delete_command(self, name):
@@ -88,3 +92,18 @@ class CurlStore:
     @staticmethod
     def verify_curl(curl_cmd):
         return curl_cmd.strip().startswith("curl") and len(curl_cmd.strip()) > 0
+
+    @staticmethod
+    def strip_hack(command):
+        undesirable_map = {
+            "{ ": "{",
+            "} ": "}",
+            "[ ": "[",
+            "] ": "]",
+        }
+        for key, value in undesirable_map.items():
+            while key in command:
+                command = command.replace(key, value)
+        return command
+
+
