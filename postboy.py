@@ -174,11 +174,11 @@ def process_variable_option(command: str, requested_variables: list):
         new_value = input(f"Enter the value for '{var_name}': ")
         store.set_variable(var_name, new_value)
         if var_name in store.grablist:
-            store.grablist.remove(var_name)
+            store.grablist.discard(var_name)
         print(f"'{var_name}' saved.")
 
     def grab_var():
-        store.grablist.append(var_name)
+        store.grablist.add(var_name)
         print(f"'{var_name}' is set to be extracted from responses.")
 
     name_specific_commands_map = {

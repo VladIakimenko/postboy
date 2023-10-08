@@ -11,7 +11,7 @@ class CurlStore:
     def __init__(self):
         self.commands = {}
         self.variables = {}
-        self.grablist = []
+        self.grablist = set()
 
         if os.path.exists(self.commands_file):
             with open(self.commands_file, "r") as f:
