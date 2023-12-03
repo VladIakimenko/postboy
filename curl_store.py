@@ -91,7 +91,7 @@ class CurlStore:
 
     @staticmethod
     def verify_curl(curl_cmd):
-        curl_cmd = curl_cmd.strip()
+        curl_cmd = ' '.join(curl_cmd.replace("\\\n", "").split())
 
         if not curl_cmd.startswith("curl"):
             return False, "The command must start with 'curl'."
@@ -103,16 +103,19 @@ class CurlStore:
 
         http_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
 
-        if '-X' not in parts:
-            return False, "An HTTP method must be explicitly stated using -X option (even if it's GET)."
+        if '-X' in parts:
+            method_index = parts.index('-X') + 1
+            if method_index >= len(parts):
+                return False, "An HTTP method must be specified after -X."
+            if parts[method_index].upper() not in http_methods and not re.match(r'\{\{.*\}\}', parts[method_index]):
+                return False, "A valid HTTP method or placeholder must follow the -X option."
 
-        method_index = parts.index('-X') + 1
-        if method_index >= len(parts) or parts[method_index].upper() not in http_methods:
-            return False, "A valid HTTP method must follow the -X option."
-
-        url_part_exists = any(re.match(r'http[s]?://', part, re.IGNORECASE) for part in parts[2:])
+        url_part_exists = any(
+            re.match(r'http[s]?://', part, re.IGNORECASE) or
+            re.match(r'\{\{.*\}\}', part) for part in parts[2:]
+        )
         if not url_part_exists:
-            return False, "A valid URL must be provided."
+            return False, "A valid URL or placeholder must be provided."
 
         for i, part in enumerate(parts):
             if part in ("-H", "-F", "-d") and (i == len(parts) - 1 or parts[i + 1].startswith('-')):
@@ -120,17 +123,37 @@ class CurlStore:
 
         return True, ''
 
+    # @staticmethod
+    # def strip_hack(command):
+    #     undesirable_map = {
+    #         "{ ": "{",
+    #         "} ": "}",
+    #         "[ ": "[",
+    #         "] ": "]",
+    #     }
+    #     for key, value in undesirable_map.items():
+    #         while key in command:
+    #             command = command.replace(key, value)
+    #     return command
+
     @staticmethod
     def strip_hack(command):
-        undesirable_map = {
-            "{ ": "{",
-            "} ": "}",
-            "[ ": "[",
-            "] ": "]",
-        }
-        for key, value in undesirable_map.items():
-            while key in command:
-                command = command.replace(key, value)
+        # Remove spaces after { and before }
+        command = re.sub(r'\{\s+', '{', command)
+        command = re.sub(r'\s+\}', '}', command)
+
+        # Remove spaces after [ and before ]
+        command = re.sub(r'\[\s+', '[', command)
+        command = re.sub(r'\s+\]', ']', command)
+
+        # Remove spaces after " and before } inside JSON strings
+        json_pattern = r'("[^"]*")'
+        matches = re.finditer(json_pattern, command)
+        for match in matches:
+            json_string = match.group(1)
+            modified_string = json_string.replace(' "', '"').replace('" ', '"')
+            command = command.replace(json_string, modified_string)
+
         return command
 
 

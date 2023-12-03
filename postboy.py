@@ -6,6 +6,7 @@ import shlex
 from completers import CombinedCompleter, Completer
 from curl_store import CurlStore
 
+
 readline.parse_and_bind("tab: complete")
 CURL_OPTIONS = ["add", "list", "view", "change", "delete", "execute"]
 VAR_OPTIONS = ["variables", "set", "grab"]
@@ -47,7 +48,7 @@ def format_curl(command: str) -> str:
             continue
 
         if part in ("-H", "-F"):
-            formatted_command.append(f"{part} \"{parts[i + 1]}\" \\")
+            formatted_command.append(f"{part} '{parts[i + 1]}' \\")
             skip_next = True
         elif part == "-d":
             formatted_json = json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4)
@@ -200,7 +201,7 @@ if __name__ == "__main__":
     # The dict.keys() provides a view object that displays a list of all the keys in the dictionary.
     # This means, when a new command or variable is added or removed in the underlying dictionary,
     # the curl_commands and variables views are automatically updated.
-    # As a result, the Competer objects will always offer options
+    # As a result, the Completer objects will always offer options
     # that are current and inclusive of recently added commands or variables, without
     # requiring a manual update or refresh, while the CombinedCompleter object will only require
     # a partial refresh.
@@ -232,13 +233,6 @@ if __name__ == "__main__":
                     process_variable_option(choice, args)
 
                 elif choice == "quit":
-                    # temp formatting block  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                    for key, value in store.commands.items():
-                        value = " ".join(value.split())
-                        value = value.replace("\\", "")
-                        value = store.strip_hack(value)
-                        store.commands[key] = value
-                    # >>>>>>>>>  remove when all the curls migrate to proper format
                     store.save_to_files()
                     print("Data saved. Any key to exit.")
                     input()
