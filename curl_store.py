@@ -37,6 +37,9 @@ class CurlStore:
         self.variables[key] = value
         return f"{key}: '{value}'"
 
+    def unset_variable(self, key):
+        return self.variables.pop(key, None)
+
     def grab_from_response(self, parsed_response: dict) -> list[str]:
         saved_variables = []
         for key in self.grablist:

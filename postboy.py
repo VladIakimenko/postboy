@@ -9,7 +9,7 @@ from curl_store import CurlStore
 
 readline.parse_and_bind("tab: complete")
 CURL_OPTIONS = ["add", "list", "view", "change", "delete", "execute"]
-VAR_OPTIONS = ["variables", "set", "grab"]
+VAR_OPTIONS = ["variables", "set", "grab", "unset"]
 COMMON_OPTIONS = ["quit"]
 
 
@@ -182,9 +182,15 @@ def process_variable_option(command: str, requested_variables: list):
         store.grablist.add(var_name)
         print(f"'{var_name}' is set to be extracted from responses.")
 
+    def unset_var():
+        removed = store.unset_variable(var_name)
+        result = "removed from" if removed else "not found in"
+        print(f"'{var_name}' {result} variables.")
+
     name_specific_commands_map = {
         "set": set_var,
         "grab": grab_var,
+        "unset": unset_var,
     }
 
     if command == "variables":
