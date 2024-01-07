@@ -202,15 +202,16 @@ def process_variable_option(command: str, requested_variables: list):
 
 if __name__ == "__main__":
     store = CurlStore()
-
-    # We use dict.keys() for completers' options here to leverage the dicts property of updating dynamically.
-    # The dict.keys() provides a view object that displays a list of all the keys in the dictionary.
-    # This means, when a new command or variable is added or removed in the underlying dictionary,
-    # the curl_commands and variables views are automatically updated.
-    # As a result, the Completer objects will always offer options
-    # that are current and inclusive of recently added commands or variables, without
-    # requiring a manual update or refresh, while the CombinedCompleter object will only require
-    # a partial refresh.
+    """
+    We use dict.keys() for completers' options here to leverage the dicts property of updating dynamically.
+    The dict.keys() provides a view object that displays a list of all the keys in the dictionary.
+    This means, when a new command or variable is added or removed in the underlying dictionary,
+    the curl_commands and variables views are automatically updated.
+    As a result, the Completer objects will always offer options
+    that are current and inclusive of recently added commands or variables, without
+    requiring a manual update or refresh, while the CombinedCompleter object will only require
+    a partial refresh.
+    """
     curl_commands = store.commands.keys()
     variables = store.variables.keys()
     curl_completer = Completer(options=curl_commands)

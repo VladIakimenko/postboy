@@ -126,30 +126,17 @@ class CurlStore:
 
         return True, ''
 
-    # @staticmethod
-    # def strip_hack(command):
-    #     undesirable_map = {
-    #         "{ ": "{",
-    #         "} ": "}",
-    #         "[ ": "[",
-    #         "] ": "]",
-    #     }
-    #     for key, value in undesirable_map.items():
-    #         while key in command:
-    #             command = command.replace(key, value)
-    #     return command
 
     @staticmethod
     def strip_hack(command):
-        # Remove spaces after { and before }
+        # Remove spaces after "{", "[" and before "}", "]"
         command = re.sub(r'\{\s+', '{', command)
         command = re.sub(r'\s+\}', '}', command)
 
-        # Remove spaces after [ and before ]
         command = re.sub(r'\[\s+', '[', command)
         command = re.sub(r'\s+\]', ']', command)
 
-        # Remove spaces after " and before } inside JSON strings
+        # Remove spaces around " and inside JSON strings
         json_pattern = r'("[^"]*")'
         matches = re.finditer(json_pattern, command)
         for match in matches:
