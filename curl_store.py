@@ -94,7 +94,7 @@ class CurlStore:
 
     @staticmethod
     def verify_curl(curl_cmd):
-        curl_cmd = ' '.join(curl_cmd.replace("\\\n", "").split())
+        curl_cmd = " ".join(curl_cmd.replace("\\\n", "").split())
 
         if not curl_cmd.startswith("curl"):
             return False, "The command must start with 'curl'."
@@ -104,28 +104,29 @@ class CurlStore:
         if len(parts) < 3:
             return False, "The command is incomplete."
 
-        http_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
+        http_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
 
         if '-X' in parts:
-            method_index = parts.index('-X') + 1
+            method_index = parts.index("-X") + 1
             if method_index >= len(parts):
                 return False, "An HTTP method must be specified after -X."
-            if parts[method_index].upper() not in http_methods and not re.match(r'\{\{.*\}\}', parts[method_index]):
+            if parts[method_index].upper() not in http_methods and not re.match(r"\{\{.*\}\}", parts[method_index]):
                 return False, "A valid HTTP method or placeholder must follow the -X option."
 
         url_part_exists = any(
-            re.match(r'http[s]?://', part, re.IGNORECASE) or
-            re.match(r'\{\{.*\}\}', part) for part in parts[2:]
+            re.match(r"http[s]?://", part, re.IGNORECASE) or
+            re.match(r"\{\{.*\}\}", part) or
+            re.match(r"localhost(:\d+)?(/.*)?", part) or
+            re.match(r"\w+(:\d+)?(/.*)?", part) for part in parts[2:]
         )
         if not url_part_exists:
             return False, "A valid URL or placeholder must be provided."
 
         for i, part in enumerate(parts):
-            if part in ("-H", "-F", "-d") and (i == len(parts) - 1 or parts[i + 1].startswith('-')):
+            if part in ("-H", "-F", "-d") and (i == len(parts) - 1 or parts[i + 1].startswith("-")):
                 return False, f"The option '{part}' must have an accompanying value."
 
-        return True, ''
-
+        return True, ""
 
     @staticmethod
     def strip_hack(command):

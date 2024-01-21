@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import readline
-import shlex
+import re
 
 from completers import CombinedCompleter, Completer
 from curl_store import CurlStore
@@ -37,37 +37,46 @@ def process_response(response):
 
 
 def format_curl(command: str) -> str:
-    parts = shlex.split(command)
+    curl_command = re.search(r'^(curl.*?) ', command)
+    formatted_command = f"{curl_command.group().strip()} \\\n" if curl_command else ""
+    x_flag = re.search(r'-X\s+(\w+)', command)
+    if x_flag:
+        formatted_command += f"-X {x_flag.group(1)} \\\n"
+    else:
+        formatted_command += "-X GET \\\n"
 
-    formatted_command = []
-    skip_next = False
+    h_parts = re.findall(r'-H\s+\'(.*?)\'', command)
+    for part in h_parts:
+        formatted_command += f"-H '{part}' \\\n"
 
-    for i, part in enumerate(parts):
-        if skip_next:
-            skip_next = False
-            continue
+    f_parts = re.findall(r'-F\s+\'(.*?)\'', command)
+    for part in f_parts:
+        name, value = part.split('=')
+        try:
+            json_data = json.loads(value)
+            formatted_json = json.dumps(json_data, ensure_ascii=False, indent=4)
+            formatted_command += f"-F '{name}={formatted_json}' \\\n"
+        except json.JSONDecodeError:
+            formatted_command += f"-F '{part}' \\\n"
 
-        if part in ("-H", "-F"):
-            formatted_command.append(f"{part} '{parts[i + 1]}' \\")
-            skip_next = True
-        elif part == "-d":
-            formatted_json = json.dumps(json.loads(parts[i + 1]), ensure_ascii=False, indent=4)
-            formatted_command.append(f"{part} '{formatted_json}' \\")
-            skip_next = True
-        else:
-            formatted_command.append(part)
+    d_part = re.search(r'-d\s+\'(.*?)\'', command)
+    if d_part:
+        formatted_json = json.dumps(json.loads(d_part.group(1)), ensure_ascii=False, indent=4)
+        formatted_command += f"-d '{formatted_json}' \\\n"
 
-    first_part = ' '.join(formatted_command[:3])
-    rest_of_the_command = '\n'.join([part for part in formatted_command[3:-1] if part.strip()])
-    last_part = formatted_command[-1] if formatted_command[-1].strip() else ""
+    url_part = re.search(r'(localhost[^ ]*|http[s]?://[^ ]*)', command)
+    if url_part:
+        formatted_command += f"{url_part.group(1)}".strip("\',\"")
 
-    final_command = first_part
-    if rest_of_the_command:
-        final_command += " \\\n" + rest_of_the_command
+    other_flags = re.findall(r'-([^XHSFd])(?:\s+("[^"]*"|\'[^\']*\'|[^"\'\s]+))?', command)
+    for flag, val in other_flags:
+        if val:
+            formatted_command += f" \\\n-{flag} {val}"
 
-    final_command += "\n" + last_part if last_part else ""
+    if not h_parts and not f_parts and not d_part:
+        formatted_command = formatted_command.replace(" \\\n", " ")
 
-    return CurlStore.strip_hack(final_command)
+    return formatted_command
 
 
 def process_curl_option(command: str, requested_curls: list):

@@ -197,9 +197,9 @@ directly. This means that `execute auth_user` would result in exactly the same a
 ## Operations with variables
 Variables serve as a mean to incorporate dynamic content into requests by replacing placeholders formatted as 
 '*{{var_name}}*'. A common scenario involves a request carrying a payload that requires a value previously returned 
-by the server in an earlier response. Here, we assign the value to a variable, and the value of this variable is used
+by the server in an earlier response. Here, we assign the value to a variable, which is used
 to replace the placeholder with the corresponding name. For example, variables are frequently used to insert an access 
-token into the request header, which was obtained from a prior response, to avoid copy-pasting it every time.
+token, which was obtained from a prior response, into the request header to avoid copy-pasting it every time.
 
 ***Placeholders***  
 The application supports placeholders in the curl commands enclosed in '*{{variable_name}}*'. If the curl is saved 
@@ -213,7 +213,8 @@ curl -X GET \
 http://127.0.0.1:8000/api/users/
 ```
 
-This curl will search for a variable with the name '*access_token*'.
+This curl will search for a variable with the name '*access_token*'.  
+
 The variables may be both `set` manually or updated from responses every time it contains a key, corresponding 
 to the variable name. You can adjust the application to 'listen' for a specific key with the `grab` command. When 
 you later manually `set` a variable which is being listened to, it will stop being updated from responses and use the 
@@ -230,7 +231,7 @@ NOTE: Setting a variable removes it from the list of automatically updated varia
 ### variables
 This command takes no arguments.  
 Displays the list of all currently saved variables and their values. If no variables have been saved yet, will display 
-the message accordingly. 
+the message accordingly.  
 Variables are not saved between the sessions, so the lifetime of a variable is only until the application is 
 closed.
 
